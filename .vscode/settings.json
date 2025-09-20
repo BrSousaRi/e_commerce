@@ -1,0 +1,15 @@
+{
+  // Oculta arquivos e pastas específicos
+  "files.exclude": {
+    "**/profiles.yml": true,
+    "**/.env": true,
+    "**/.gitignore": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/target": true,
+    "**/logs": true
+  },
+
+  // Ocultar automaticamente tudo que está no .gitignore
+  "explorer.excludeGitIgnore": true
+}
