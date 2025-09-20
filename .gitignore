@@ -1,0 +1,27 @@
+echo "# Senhas e configs
+.env
+*.env
+profiles.yml
+dbt/profiles.yml
+
+# Logs
+logs/
+*.log
+dbt/logs/
+
+# DBT compilados
+dbt/target/
+dbt/dbt_packages/
+
+# Python
+__pycache__/
+*.pyc
+
+# Dados
+seeds/*.csv
+data/
+*.csv
+
+# Docker volumes
+postgres-db-volume/
+postgres-dw-volume/" > .gitignore
