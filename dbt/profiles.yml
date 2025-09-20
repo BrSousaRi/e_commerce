@@ -1,0 +1,13 @@
+olist_ecommerce:
+  outputs:
+    dev:
+      type: postgres
+      host: postgres-dw
+      user: dbt
+      password: dbt123
+      port: 5432
+      dbname: warehouse
+      schema: public
+      threads: 4
+      keepalives_idle: 0
+  target: dev

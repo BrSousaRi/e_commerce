@@ -1,0 +1,148 @@
+
+
+version: '3.8'
+
+services:
+  # Base de dados PostgreSQL
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    ports:
+      - "5432:5432"
+
+  # Data Warehouse PostgreSQL (para DBT)
+  postgres-dw:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: dbt
+      POSTGRES_PASSWORD: dbt123
+      POSTGRES_DB: warehouse
+    volumes:
+      - postgres-dw-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dbt"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    ports:
+      - "5433:5432"
+
+  # DBT
+  dbt:
+    build:
+      context: .
+      dockerfile: Dockerfile.dbt
+    environment:
+      DBT_PROFILES_DIR: /usr/app/dbt
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dbt:/usr/app/dbt
+      - ${AIRFLOW_PROJ_DIR:-.}/seeds:/usr/app/seeds
+      - ${AIRFLOW_PROJ_DIR:-.}/data:/usr/app/data
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+    command: tail -f /dev/null  # Mantém container rodando
+    restart: always
+
+  # Airflow Webserver
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-dw:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: 'Iqx3WE-1mXWgOGWKOxb-D3gKF3n2w2c7eGPXB4yyMAA='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      # DBT Connection
+      DBT_POSTGRES_HOST: postgres-dw
+      DBT_POSTGRES_USER: dbt
+      DBT_POSTGRES_PASSWORD: dbt123
+      DBT_POSTGRES_DB: warehouse
+      DBT_POSTGRES_PORT: 5432
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
+      - ${AIRFLOW_PROJ_DIR:-.}/seeds:/opt/airflow/seeds
+      - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@admin.com --password admin123 ||true &&
+        airflow webserver
+      "
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-dw:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: 'Iqx3WE-1mXWgOGWKOxb-D3gKF3n2w2c7eGPXB4yyMAA='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      # DBT Connection
+      DBT_POSTGRES_HOST: postgres-dw
+      DBT_POSTGRES_USER: dbt
+      DBT_POSTGRES_PASSWORD: dbt123
+      DBT_POSTGRES_DB: warehouse
+      DBT_POSTGRES_PORT: 5432
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
+      - ${AIRFLOW_PROJ_DIR:-.}/seeds:/opt/airflow/seeds
+      - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: airflow scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+volumes:
+  postgres-db-volume:
+  postgres-dw-volume:

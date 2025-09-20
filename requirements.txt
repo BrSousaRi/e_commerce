@@ -1,0 +1,26 @@
+# Análise de Dados e DBT
+pandas==2.3.2
+sqlalchemy==2.0.43
+psycopg2-binary==2.9.10
+
+# DBT
+dbt-core==1.6.0
+dbt-postgres==1.6.0
+
+# Visualização (se usar notebooks)
+matplotlib==3.10.1
+seaborn==0.13.2
+jupyter==1.1.1
+jupyterlab==4.4.5
+
+# Utilitários
+python-dateutil==2.9.0.post0
+pytz==2025.2
+python-slugify==8.0.4
+
+# Airflow Dependencies (se necessário)
+apache-airflow==3.0.6
+
+# Desenvolvimento
+pytest==8.3.5
+black==25.9.0

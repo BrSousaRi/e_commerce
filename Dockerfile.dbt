@@ -1,0 +1,21 @@
+FROM python:3.10-slim
+
+WORKDIR /usr/app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar DBT
+RUN pip install --no-cache-dir \
+    dbt-core==1.6.0 \
+    dbt-postgres==1.6.0
+
+# Criar diretórios necessários
+RUN mkdir -p /usr/app/dbt /usr/app/seeds /usr/app/data
+
+# Configurar DBT
+ENV DBT_PROFILES_DIR=/usr/app/dbt
+
+CMD ["tail", "-f", "/dev/null"]
